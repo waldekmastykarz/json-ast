@@ -30,13 +30,24 @@ function getAstNodeFromPropertyPart(node: parse.ArrayNode, jsonProperty: string)
   if (node.children.length === 0) {
     return node;
   }
-  
+
   const jsonPropertyChunks = jsonProperty.split('.');
   if (jsonPropertyChunks.length === 0) {
     return node;
   }
 
-  const currentProperty = jsonPropertyChunks[0];
+  let currentProperty = jsonPropertyChunks[0];
+  let isArray = false;
+  let arrayElement: string | undefined;
+  if (currentProperty.endsWith(']')) {
+    isArray = true;
+    const pos = currentProperty.indexOf('[') + 1;
+    // get array element from the property name
+    arrayElement = currentProperty.substr(pos, currentProperty.length - pos - 1);
+    // remove array element from the property name
+    currentProperty = currentProperty.substr(0, pos - 1);
+  }
+
   for (let i = 0; i < node.children.length; i++) {
     const currentNode: parse.PropertyNode = node.children[i] as unknown as parse.PropertyNode;
     if (currentNode.type !== 'Property') {
@@ -49,7 +60,22 @@ function getAstNodeFromPropertyPart(node: parse.ArrayNode, jsonProperty: string)
 
     // if this is the last chunk, return current node
     if (jsonPropertyChunks.length === 1) {
-      return currentNode;
+      if (!isArray) {
+        return currentNode;
+      }
+
+      const arrayElements = (currentNode.value as parse.ArrayNode).children;
+      for (let j = 0; j < arrayElements.length; j++) {
+        if (arrayElements[j].type !== 'Literal') {
+          continue;
+        }
+
+        if ((arrayElements[j] as parse.LiteralNode).value === arrayElement) {
+          return arrayElements[j];
+        }
+      }
+
+      return undefined;
     }
 
     // more chunks left, remove current from the array, and look for child nodes
@@ -75,6 +101,6 @@ property = 'resolutions.@types/react';
 const node3 = getAstNode('file.json', property);
 assert(29 === node3?.loc?.start.line, `${property}\n${JSON.stringify(node3)}`);
 
-property = 'keywords[1]';
+property = 'keywords[sharepoint]';
 const node4 = getAstNode('file.json', property);
-assert(29 === node4?.loc?.start.line, `${property}\n${JSON.stringify(node4)}`);
+assert(32 === node4?.loc?.start.line, `${property}\n${JSON.stringify(node4)}`);
